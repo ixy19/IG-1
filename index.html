@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5-Min Risk Score & Claim Simulator</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #eff6ff;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #ea580c;
+            --dark: #0f172a;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f1f5f9;
+            color: var(--dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            padding: 30px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .lang-switcher {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+        }
+        .lang-btn {
+            background: #e2e8f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .lang-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 5px;
+            font-size: 26px;
+            font-weight: 800;
+            padding-right: 60px;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--gray);
+            margin-top: 0;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+        @media (min-width: 768px) {
+            .grid-layout { grid-template-columns: 1fr 1fr; }
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 20px;
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 8px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #334155;
+        }
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .btn-primary { background: var(--primary); color: white; margin-bottom: 10px; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-claim { background: var(--danger); color: white; }
+        .btn-claim:hover { background: #b91c1c; }
+        .visual-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        #radarCanvas { max-width: 100%; background: white; }
+        .claim-box {
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid var(--danger);
+            background: #fef2f2;
+            display: none;
+            box-sizing: border-box;
+        }
+        .blood-active { border-left-color: var(--success); background: #f0fdf4; }
+        .legend { display: flex; gap: 15px; margin-bottom: 10px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+        .cta-inline {
+            margin-top: 15px;
+            width: 100%;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="lang-switcher">
+        <button class="lang-btn" onclick="toggleLanguage()" id="lang-toggle-btn">English</button>
+    </div>
+
+    <h1 id="txt-title">5分鐘 Risk Score & Claim Simulator</h1>
+    <p class="subtitle" id="txt-subtitle">📊 輸入基本財務與保障，一鍵模擬「突發無法工作6個月」的免疫力 🎲</p>
+
+    <div class="grid-layout">
+        <!-- 左側：輸入表單 -->
+        <div class="card">
+            <div class="card-title" id="txt-form-title">✍️ 輸入基本狀況</div>
+            
+            <div class="form-group">
+                <label id="lbl-income">1. 平均月收入 (USD)</label>
+                <input type="number" id="input-income" value="8000">
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-expense">2. 每月固定支出 (房貸/生活費/育兒)</label>
+                <input type="number" id="input-expense" value="5000">
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-savings">3. 目前手頭緊急預備金 (活存)</label>
+                <input type="number" id="input-savings" value="15000">
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-family">4. 您的家庭責任狀況</label>
+                <select id="input-family">
+                    <!-- JS 動態渲染選項 -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-coverage">5. 目前已擁有的保障 (可複選)</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="has-term" checked> <span id="chk-l">壽險 (Life Insurance)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="has-disability"> <span id="chk-d">收入中斷/失能險 (Disability)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="has-ci" checked> <span id="chk-c">重大疾病險 (Critical Illness)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="has-medical" checked> <span id="chk-m">高額醫療險 (Health/Medical)</span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="calculateRisk()" id="btn-calc">1. 產生我的保障雷達圖</button>
+            <button class="btn btn-claim" onclick="simulateClaim()" id="btn-claim">💥 2. 模擬：假如我今天突然無法工作6個月</button>
+        </div>
+
+        <!-- 右側：雷達圖區 -->
+        <div class="visual-panel">
+            <div class="card-title" style="width: 100%; text-align: center;" id="txt-panel-title">🛡️ 我的安全防禦雷達圖</div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(37, 99, 235, 0.2); border: 2px solid var(--primary);"></div>
+                    <span id="txt-leg-ideal">理想安全防禦力</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(220, 38, 38, 0.4); border: 2px solid var(--danger);"></div>
+                    <span id="txt-leg-current">我目前的防禦力</span>
+                </div>
+            </div>
+
+            <canvas id="radarCanvas" width="320" height="320"></canvas>
+
+            <!-- Claim 模擬彈出訊息 -->
+            <div id="claim-result" class="claim-box">
+                <h3 id="claim-title" style="margin-top: 0; font-size: 15px;"></h3>
+                <p id="claim-desc" style="font-size: 13px; line-height: 1.5; margin-bottom: 0;"></p>
+            </div>
+
+            <!-- 右側即時行銷轉化 CTA -->
+            <div id="cta-consult" class="cta-inline">
+                <span style="font-size:12.5px; font-weight:bold; color:var(--primary);" id="txt-cta-inline">想修補雷達圖保障缺角嗎？</span>
+                <a href="#" style="margin-left:8px; font-size:12.5px; font-weight:bold; color:var(--success); text-decoration:underline;" onclick="alert('Consultation booked!')" id="txt-cta-link">即刻預約 1對1 免費分析</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentLang = 'zh';
+    const canvas = document.getElementById('radarCanvas');
+    const ctx = canvas.getContext('2d');
+    const center = 160;
+    const radius = 105;
+
+    const labelsConfig = {
+        zh: ["身故保障", "收入替代", "重大疾病", "醫療開銷", "現金預備金"],
+        en: ["Life Cover", "Income Sub", "Critical Illness", "Medical Expense", "Cash Reserve"]
+    };
+
+    const langTokens = {
+        zh: {
+            title: "5分鐘 Risk Score & Claim Simulator",
+            subtitle: "📊 輸入基本財務與保障，一鍵模擬「突發無法工作6個月」的免疫力 🎲",
+            formTitle: "✍️ 輸入基本狀況",
+            lblIncome: "1. 平均月收入 (USD)", lblExpense: "2. 每月固定支出 (房貸/生活費/育兒)", lblSavings: "3. 目前手頭緊急預備金 (活存)",
+            lblFamily: "4. 您的家庭責任狀況", lblCoverage: "5. 目前已擁有的保障 (可複選)",
+            chkL: "壽險 (Life Insurance)", chkD: "收入中斷/失能險 (Disability)", chkC: "重大疾病險 (Critical Illness)", chkM: "高額醫療險 (Health/Medical)",
+            btnCalc: "1. 產生我的保障雷達圖", btnClaim: "💥 2. 模擬：假如我今天突然無法工作6個月",
+            panelTitle: "🛡️ 我的安全防禦雷達圖", legIdeal: "理想安全防禦力", legCurrent: "我目前的防禦力",
+            ctaInline: "想修補雷達圖保障缺角嗎？", ctaLink: "即刻預約 1對1 免費分析"
+        },
+        en: {
+            title: "5-Min Risk Score & Claim Simulator",
+            subtitle: "📊 Input finances to test your immunity against 'Sudden 6 Months Disability' 🎲",
+            formTitle: "✍️ Your Financial Profile",
+            lblIncome: "1. Average Monthly Income (USD)", lblExpense: "2. Fixed Monthly Expenses (Mortgage/Life/Kids)", lblSavings: "3. Current Liquid Emergency Savings",
+            lblFamily: "4. Family Dependency & Liability", lblCoverage: "5. Existing Protection Policies (Select all)",
+            chkL: "Life Insurance", chkD: "Disability Insurance", chkC: "Critical Illness Insurance", chkM: "Health/Medical Insurance",
+            btnCalc: "1. Generate Protection Radar Chart", btnClaim: "💥 2. Simulate: What if I can't work for 6 months?",
+            panelTitle: "🛡️ My Safety Defense Radar Profile", legIdeal: "Ideal Security", legCurrent: "My Current Defense",
+            ctaInline: "Want to fill your asset protection gaps?", ctaLink: "Book 1-on-1 Free Strategy Call"
+        }
+    };
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        document.getElementById('lang-toggle-btn').innerText = currentLang === 'zh' ? 'English' : '中文';
+        renderStaticTexts();
+        calculateRisk();
+    }
+
+    function renderStaticTexts() {
+        const t = langTokens[currentLang];
+        document.getElementById('txt-title').innerText = t.title;
+        document.getElementById('txt-subtitle').innerText = t.subtitle;
+        document.getElementById('txt-form-title').innerText = t.formTitle;
+        document.getElementById('lbl-income').innerText = t.lblIncome;
+        document.getElementById('lbl-expense').innerText = t.lblExpense;
+        document.getElementById('lbl-savings').innerText = t.lblSavings;
+        document.getElementById('lbl-family').innerText = t.lblFamily;
+        document.getElementById('lbl-coverage').innerText = t.lblCoverage;
+        document.getElementById('chk-l').innerText = t.chkL;
+        document.getElementById('chk-d').innerText = t.chkD;
+        document.getElementById('chk-c').innerText = t.chkC;
+        document.getElementById('chk-m').innerText = t.chkM;
+        document.getElementById('btn-calc').innerText = t.btnCalc;
+        document.getElementById('btn-claim').innerText = t.btnClaim;
+        document.getElementById('txt-panel-title').innerText = t.panelTitle;
+        document.getElementById('txt-leg-ideal').innerText = t.legIdeal;
+        document.getElementById('txt-leg-current').innerText = t.legCurrent;
+        document.getElementById('txt-cta-inline').innerText = t.ctaInline;
+        document.getElementById('txt-cta-link').innerText = t.ctaLink;
+
+        // 刷新下拉清單
+        const familySel = document.getElementById('input-family');
+        const currentVal = familySel.value || 'kids';
+        if (currentLang === 'zh') {
+            familySel.innerHTML = `
+                <option value="single">單身無家累 (責任較低)</option>
+                <option value="spouse">有配偶/有房貸 (責任中等)</option>
+                <option value="kids">有配偶、小孩與房貸 (責任極大)</option>
+            `;
+        } else {
+            familySel.innerHTML = `
+                <option value="single">Single without Dependents (Low Risk)</option>
+                <option value="spouse">Married / Co-sign Mortgage (Moderate Risk)</option>
+                <option value="kids">Married with Children & Mortgage (High Liability)</option>
+            `;
+        }
+        familySel.value = currentVal;
+    }
+
+    let userStats = [30, 10, 40, 80, 50];
+
+    window.onload = function() {
+        renderStaticTexts();
+        calculateRisk();
+    };
+
+    function calculateRisk() {
+        document.getElementById('claim-result').style.display = 'none';
+        document.getElementById('cta-consult').style.display = 'none';
+
+        const expense = parseFloat(document.getElementById('input-expense').value) || 0;
+        const savings = parseFloat(document.getElementById('input-savings').value) || 0;
+        const family = document.getElementById('input-family').value;
+        const hasTerm = document.getElementById('has-term').checked;
+        const hasDisability = document.getElementById('has-disability').checked;
+        const hasCI = document.getElementById('has-ci').checked;
+        const hasMedical = document.getElementById('has-medical').checked;
+
+        let deathScore = hasTerm ? (family === 'single' ? 100 : (family === 'spouse' ? 80 : 60)) : (family === 'single' ? 40 : 10);
+        let incomeScore = hasDisability ? 90 : 10;
+        let ciScore = hasCI ? 85 : 15;
+        let medScore = hasMedical ? 95 : 20;
+        let monthsOfSavings = expense > 0 ? (savings / expense) : 6;
+        let savingsScore = Math.min(100, Math.round((monthsOfSavings / 6) * 100));
+
+        userStats = [deathScore, incomeScore, ciScore, medScore, savingsScore];
+        drawRadar(userStats);
+    }
+
+    function drawRadar(stats) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 1. 五角網格
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        for (let j = 1; j <= 5; j++) {
+            let r = (radius / 5) * j;
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                let x = center + r * Math.cos(angle);
+                let y = center + r * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath(); ctx.stroke();
+        }
+
+        // 2. 軸線
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            ctx.moveTo(center, center);
+            ctx.lineTo(center + radius * Math.cos(angle), center + radius * Math.sin(angle));
+        }
+        ctx.stroke();
+
+        // 3. 理想藍圈
+        ctx.fillStyle = 'rgba(37, 99, 235, 0.05)';
+        ctx.strokeStyle = 'rgba(37, 99, 235, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            let x = center + radius * Math.cos(angle);
+            let y = center + radius * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+
+        // 4. 使用者實際紅圈
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            let pct = stats[i] / 100;
+            let x = center + (radius * pct) * Math.cos(angle);
+            let y = center + (radius * pct) * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+
+        // 5. 小圓點
+        for (let i = 0; i < 5; i++) {
+            let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            let pct = stats[i] / 100;
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(center + (radius * pct) * Math.cos(angle), center + (radius * pct) * Math.sin(angle), 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 6. 文字
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        const activeLabels = labelsConfig[currentLang];
+        for (let i = 0; i < 5; i++) {
+            let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            let offset = (i === 1 || i === 4) ? 1.35 : 1.25;
+            let x = center + (radius * offset) * Math.cos(angle);
+            let y = center + (radius * offset) * Math.sin(angle);
+            if (angle === -Math.PI/2) y -= 3; else if (y > center) y += 8;
+            ctx.fillText(activeLabels[i], x, y);
+        }
+    }
+
+    function simulateClaim() {
+        calculateRisk();
+        const income = parseFloat(document.getElementById('input-income').value) || 0;
+        const expense = parseFloat(document.getElementById('input-expense').value) || 0;
+        const savings = parseFloat(document.getElementById('input-savings').value) || 0;
+        const hasDisability = document.getElementById('has-disability').checked;
+
+        const claimBox = document.getElementById('claim-result');
+        const claimTitle = document.getElementById('claim-title');
+        const claimDesc = document.getElementById('claim-desc');
+
+        let totalLossIncome = income * 6;
+        let totalExpense = expense * 6;
+        claimBox.style.display = 'block';
+        document.getElementById('cta-consult').style.display = 'block';
+
+        if (hasDisability) {
+            claimBox.className = "claim-box blood-active";
+            let payout = totalLossIncome * 0.6;
+            let finalLoss = totalExpense - payout;
+
+            if (currentLang === 'zh') {
+                claimTitle.innerHTML = "🟢 【補血成功！】大夫，我還有救！";
+                claimTitle.style.color = "var(--success)";
+                if (savings >= finalLoss) {
+                    claimDesc.innerHTML = `🚨 <strong>模擬情境：</strong>你今天起突然因傷病無法工作 6 個月。<br>🛡️ <strong>保單啟動：</strong>你的 <strong>Disability (失能險)</strong> 立刻啟動，共補貼 <strong>$${payout.toLocaleString()}</strong>！<br>💰 <strong>財務現狀：</strong>扣除保險後只需自付 $${finalLoss.toLocaleString()}，手頭的 $${savings.toLocaleString()} 存款完全可以輕鬆覆蓋，安穩度過危機！`;
+                } else {
+                    claimDesc.innerHTML = `🚨 <strong>模擬情境：</strong>你今天起突然無法工作 6 個月。<br>🛡️ <strong>保單啟動：</strong>你的 <strong>Disability</strong> 幫你補血了 <strong>$${payout.toLocaleString()}</strong>。<br>⚠️ <strong>警告：</strong>但由於你的現金儲備太低，剩餘自付額依然會將你的活存抽乾！建議調高保障。`;
+                }
+            } else {
+                claimTitle.innerHTML = "🟢 [Recovery Succeeded] Asset Protected!";
+                claimTitle.style.color = "var(--success)";
+                if (savings >= finalLoss) {
+                    claimDesc.innerHTML = `🚨 <strong>Scenario:</strong> Sudden sickness prevents work for 6 months.<br>🛡️ <strong>Policy In Action:</strong> Your <strong>Disability policy</strong> pays out 60% salary (<strong>$${payout.toLocaleString()}</strong> total).<br>💰 <strong>Finances:</strong> Out-of-pocket gap drops to $${finalLoss.toLocaleString()}. Your $${savings.toLocaleString()} bank account absorbs it smoothly. No crash!`;
+                } else {
+                    claimDesc.innerHTML = `🚨 <strong>Scenario:</strong> Sudden sickness prevents work for 6 months.<br>🛡️ <strong>Policy In Action:</strong> Disability policy grants <strong>$${payout.toLocaleString()}</strong>.<br>⚠️ <strong>Warning:</strong> Yet your emergency reserves ($${savings.toLocaleString()}) are too low; the remaining gap will bleed your account dry. Raise limits.`;
+                }
+            }
+        } else {
+            claimBox.className = "claim-box";
+            if (currentLang === 'zh') {
+                claimTitle.innerHTML = "🔴 【失血警告！】財務主動脈破裂";
+                claimTitle.style.color = "var(--danger)";
+                if (savings >= totalExpense) {
+                    claimDesc.innerHTML = `🚨 <strong>模擬情境：</strong>你今天起突然因傷病無法工作 6 個月。<br>❌ <strong>保單缺口：</strong>你<strong>沒有</strong>失能險，保險補血量為 <strong>$0</strong>！<br>💸 <strong>財務代價：</strong>你被迫透支存款。半年內必須<strong>硬生生挖走 $${totalExpense.toLocaleString()}</strong>，辛苦積攢的理財本金瞬間化為烏有！`;
+                } else {
+                    let shortfall = totalExpense - savings;
+                    claimDesc.innerHTML = `🚨 <strong>模擬情境：</strong>因傷病無法工作 6 個月。<br>❌ <strong>嚴重破產危機：</strong>保險補血量為 $0，半年開銷達 $${totalExpense.toLocaleString()}，存款僅 $${savings.toLocaleString()}。<br>☠️ <strong>財務缺口：$${shortfall.toLocaleString()}</strong>！在第 ${(savings/expense).toFixed(1)} 個月時，你將面臨房貸斷供、信用破產。`;
+                }
+            } else {
+                claimTitle.innerHTML = "🔴 [Bleeding Shock] Financial Artery Ruptured";
+                claimTitle.style.color = "var(--danger)";
+                if (savings >= totalExpense) {
+                    claimDesc.innerHTML = `🚨 <strong>Scenario:</strong> Sickness halts your career for 6 months.<br>❌ <strong>Insurance Gap:</strong> You have <strong>NO</strong> disability cover. Net payout is <strong>$0</strong>.<br>💸 <strong>Financial Damage:</strong> Drained reserves. You must <strong>extract $${totalExpense.toLocaleString()} straight out of savings</strong>, evaporating your core capital.`;
+                } else {
+                    let shortfall = totalExpense - savings;
+                    claimDesc.innerHTML = `🚨 <strong>Scenario:</strong> Sickness halts career for 6 months.<br>❌ <strong>Insolvency Threat:</strong> Zero coverage. Total 6-mo overhead is $${totalExpense.toLocaleString()}, savings are $${savings.toLocaleString()}.<br>☠️ <strong>Deficit: $${shortfall.toLocaleString()}</strong>! By month ${(savings/expense).toFixed(1)}, your mortgage defaults into immediate collapse.`;
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
